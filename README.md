@@ -9,7 +9,6 @@ To get started, you need to clone this repository and install the necessary depe
 git clone https://github.com/pranay-mog/Assignment-CSVreader.git
 cd csv-upload-parsing-apis
 npm install
-Before running the application, you also need to set up a SQL database and create a .env file with the database credentials:
 
 Uploading CSV Files
 To upload a CSV file, you need to send a POST request to the /import-csv endpoint with the file attached as a multipart/form-data payload. The application will parse the file and store the data in the database.
