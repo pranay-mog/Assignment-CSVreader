@@ -38,11 +38,11 @@ var upload = multer({
   storage: storage,
 });
 
-app.get("/", (req, res) => {
+app.get("/", async (req, res) => {
   res.sendFile(__dirname + "/index.html");
 });
 
-app.get("/transactions", (req, res) => {
+app.get("/transactions", async (req, res) => {
   let query = "SELECT * FROM expenses";
   let conditions = [];
   let params = [];
@@ -61,25 +61,19 @@ app.get("/transactions", (req, res) => {
   }
   // console.log(query);
 
-  pool.getConnection((error, connection) => {
-    if (error) {
-      console.error(error);
-    } else {
-      connection.query(query, params, (error, results) => {
-        connection.release();
-        if (error) {
-          console.error(error);
-          res.status(500).send("Error retrieving transactions");
-        } else {
-          console.log(results);
-          res.render("resul", { transactions: results });
-        }
-      });
-    }
-  });
+  try {
+    const connection = await getConnection();
+    const [results, fields] = await connection.query(query, params);
+    connection.release();
+    console.log(results);
+    res.render("resul", { transactions: results });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Error retrieving transactions");
+  }
 });
 
-app.get("/insert", (req, res) => {
+app.post("/insert", async (req, res) => {
   const query =
     "INSERT INTO expenses (Date, Description, Amount, Currency) VALUES (?, ?, ?, ?)";
   const params = [
@@ -88,124 +82,97 @@ app.get("/insert", (req, res) => {
     req.body.amount,
     req.body.currency,
   ];
-  pool.getConnection((error, connection) => {
-    if (error) {
-      console.error(error);
-      res.status(500).send("Error inserting transaction");
-    } else {
-      connection.query(query, params, (error, result) => {
-        connection.release();
-        if (error) {
-          console.error(error);
-          res.status(500).send("Error inserting transaction");
-        } else {
-          res.redirect("/");
-        }
-      });
-    }
-  });
+
+  try {
+    const connection = await getConnection();
+    const [result, fields] = await connection.query(query, params);
+    connection.release();
+    res.redirect("/");
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Error inserting transaction");
+  }
 });
 
-app.get("/delete", (req, res) => {
+app.get("/delete", async (req, res) => {
   const date = req.query.transactionDate;
   const query = "DELETE FROM expenses WHERE Date = ?";
   console.log(date);
-  pool.getConnection((error, connection) => {
-    if (error) {
-      console.error(error);
-      res.status(500).send("Error deleting transaction");
+
+  try {
+    const connection = await getConnection();
+    const [result, fields] = await connection.query(query, [date]);
+    connection.release();
+    if (result.affectedRows === 0) {
+      res.status(404).send("Transaction not found");
     } else {
-      connection.query(query, [date], (error, result) => {
-        connection.release();
-        if (error) {
-          console.error(error);
-          res.status(500).send("Error deleting transaction");
-        } else if (result.affectedRows === 0) {
-          res.status(404).send("Transaction not found");
-        } else {
-          res.redirect("/");
-        }
-      });
+      res.redirect("/");
     }
-  });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Error deleting transaction");
+  }
 });
 
-app.post("/import-csv", upload.single("import-csv"), (req, res) => {
+app.post("/import-csv", upload.single("import-csv"), async (req, res) => {
   console.log(req.file.path);
   uploadCsv(__dirname + "/uploads/" + req.file.filename);
   res.send("data imported done");
 });
 
 function uploadCsv(uriFile) {
-  let stream = fs.createReadStream(uriFile);
-  let csvDataColl = [];
-  let fileStream = csv
-    .parse()
-    .on("data", function (data) {
-      csvDataColl.push(data);
-    })
-    .on("end", function () {
-      let headers = csvDataColl.shift();
-      // console.log(headers);
-      // console.log(csvDataColl[0]);
-      // console.log(csvDataColl[4]);
+  let stream
 
-      csvDataColl.forEach((data) => {
-        let dateString = data[0];
 
-        let formatedDate = "";
-        let year = dateString.substring(dateString.length - 4);
-        let month = dateString.substring(3, 5);
-        let day = dateString.substring(0, 2);
-        formatedDate = year + "-" + month + "-" + day;
-
-        data[0] = formatedDate;
-
-        if (data[3] !== "INR") {
-          axios
-            .get(
-              `https://api.exchangerate-api.com/v4/latest/INR?base=${data[3]}` // This api gives out today's exchange rates.
-            )         // to get the amount converted into INR on the respective day, we need to try it on https://openexchangerates.org/signup.
-            .then((response) => {
-              console.log(data);
+  async function uploadCsv(uriFile) {
+    let stream = fs.createReadStream(uriFile);
+    let csvDataColl = [];
+    let fileStream = csv.parse()
+      .on("data", function (data) {
+        csvDataColl.push(data);
+      })
+      .on("end", async function () {
+        let headers = csvDataColl.shift();
+        
+        for (let i = 0; i < csvDataColl.length; i++) {
+          let data = csvDataColl[i];
+          let dateString = data[0];
+          let formatedDate = "";
+          let year = dateString.substring(dateString.length - 4);
+          let month = dateString.substring(3, 5);
+          let day = dateString.substring(0, 2);
+          formatedDate = year + "-" + month + "-" + day;
+          data[0] = formatedDate;
+  
+          if (data[3] !== "INR") {
+            try {
+              const response = await axios.get(`https://api.exchangerate-api.com/v4/latest/INR?base=${data[3]}`); // This conversion is based on today's exchange rates. 
+              console.log(data); //to get the exchange rate on that particular day, we can use https://openexchangerates.org/signup.
               data[2] = (data[2] * response.data.rates.INR).toFixed(2);
               data[3] = "INR";
               console.log(data);
-              pool.getConnection((error, connection) => {
-                if (error) {
-                  console.error(error);
-                } else {
-                  let createTableQuery =
-                    "CREATE TABLE IF NOT EXISTS expenses (";
-                  headers.forEach((header, index) => {
-                    createTableQuery += header + " VARCHAR(255)";
-                    if (index < headers.length - 1) {
-                      createTableQuery += ",";
-                    }
-                  });
-                  createTableQuery += ")";
-                  console.log(createTableQuery);
-                  connection.query(createTableQuery, (error, res) => {
-                    console.log(error || res);
-                    let query = "INSERT INTO expenses VALUES( ? )";
-                    connection.query(query, [data], (error, res) => {
-                      console.log(error || res);
-                    });
-                  });
-                }
-              });
-            })
-            .catch((error) => {
+  
+              const connection = await pool.getConnection();
+              const createTableQuery = "CREATE TABLE IF NOT EXISTS expenses (" + headers.map(header => `${header} VARCHAR(255)`).join(",") + ")";
+              console.log(createTableQuery);
+              await connection.query(createTableQuery);
+  
+              const query = "INSERT INTO expenses VALUES( ? )";
+              await connection.query(query, [data]);
+  
+              connection.release();
+            } catch (error) {
               console.log(error);
-            });
+            }
+          }
         }
+  
+        fs.unlinkSync(uriFile);
       });
-
-      fs.unlinkSync(uriFile);
-    });
-
-  stream.pipe(fileStream);
+  
+    stream.pipe(fileStream);
+  }
+  
 }
-
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Node app serving on port: ${PORT}`));
