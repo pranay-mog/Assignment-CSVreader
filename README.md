@@ -19,9 +19,13 @@ Using the APIs
 The application provides the following APIs:
 
 GET /transactions: returns all the transactions in the database.
+
 GET /transactions/:id: returns the transaction with the specified ID.
+
 PUT /transactions/:id: updates the transaction with the specified ID.
+
 POST /transactions: adds a new transaction to the database.
+
 DELETE /transactions/:id: deletes the transaction with the specified ID.
 
 To use these APIs, you need to send HTTP requests to the respective endpoints. You can use tools like Postman or curl to send the requests.
