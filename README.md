@@ -7,9 +7,10 @@ To get started, you need to clone this repository and install the necessary depe
 
 
 git clone https://github.com/pranay-mog/Assignment-CSVreader.git
+
 cd csv-upload-parsing-apis
+
 npm install
-Before running the application, you also need to set up a SQL database and create a .env file with the database credentials:
 
 Uploading CSV Files
 To upload a CSV file, you need to send a POST request to the /import-csv endpoint with the file attached as a multipart/form-data payload. The application will parse the file and store the data in the database.
@@ -18,9 +19,13 @@ Using the APIs
 The application provides the following APIs:
 
 GET /transactions: returns all the transactions in the database.
-GET /transactions/:id: returns the transaction with the specified ID.
-PUT /transactions/:id: updates the transaction with the specified ID.
+
+GET /transactions/:date: returns the transaction with the specified date.
+
+PUT /transactions/:date: updates the transaction with the specified date.
+
 POST /transactions: adds a new transaction to the database.
-DELETE /transactions/:id: deletes the transaction with the specified ID.
+
+DELETE /transactions/:date: deletes the transaction with the specified date.
 
 To use these APIs, you need to send HTTP requests to the respective endpoints. You can use tools like Postman or curl to send the requests.
