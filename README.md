@@ -7,7 +7,9 @@ To get started, you need to clone this repository and install the necessary depe
 
 
 git clone https://github.com/pranay-mog/Assignment-CSVreader.git
+
 cd csv-upload-parsing-apis
+
 npm install
 
 Uploading CSV Files
